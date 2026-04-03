@@ -1,13 +1,8 @@
 """
-12-Month Optimization — Find what actually works over a full year.
-
-Key changes from V1-V5:
-  - Optimize ON 12-month data (not 41 days)
-  - Walk-forward: optimize on months 1-6, validate on months 7-12
-  - Add volatility regime filter (only trade when ATR is elevated)
-  - Add previous day range filter (breakouts work better after tight days)
-  - Test short-only seriously (longs lost money over 12 months)
-  - Focus on reducing outlier dependency
+Walk-forward optimization on 12 months of Alpaca data.
+Train on the first half, validate on the second half — no peeking.
+Tests volatility regime and previous-day range filters on top of the V3/V4 base.
+Short-only gets serious attention here since longs underperformed on the longer dataset.
 """
 
 import sys
@@ -28,7 +23,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 
 def add_volatility_features(df):
-    """Add vol regime features for filtering."""
+    """Compute 5-day and 20-day avg range, their ratio, and prev-day range for coiled-spring detection."""
     df = df.copy()
 
     # 5-day ATR as % of price
@@ -57,7 +52,7 @@ def add_volatility_features(df):
 
 
 def generate_signals_12m(df, params):
-    """Signal generation with volatility and quality filters."""
+    """Generate ORB signals with volatility regime, prev-day range, and OR quality filters baked in."""
     df = df.copy()
 
     or_minutes = params.get('or_minutes', 12)
@@ -159,7 +154,7 @@ def generate_signals_12m(df, params):
 
 
 def run_sim(data, params, start_day=None, end_day=None):
-    """Run one config, optionally on a date subset."""
+    """Run one param config over the full dataset or a date slice. Returns a stats dict, or None if too few trades."""
     sim_data = {}
     total_signals = 0
 
@@ -237,6 +232,7 @@ def run_sim(data, params, start_day=None, end_day=None):
 
 
 def main():
+    """Run the walk-forward grid search and print the configs that survive both halves."""
     print("=" * 70)
     print("12-MONTH STRATEGY OPTIMIZATION")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

@@ -1,6 +1,7 @@
 """
-Fetch maximum historical intraday data from Alpaca (2016-2026).
-Downloads 1-min bars in monthly chunks, resamples to 5-min, stores as parquet.
+Pulls the full 10-year history of 1-min bars from Alpaca and stores as 5-min parquet.
+Uses 2-week chunks to stay under the API's SIP restriction cutoff (March 2026).
+Splits the universe by listing date — most go back to 2016, a few only to 2019.
 """
 
 import os
@@ -33,7 +34,7 @@ UNIVERSE_SHORT = ["PLTR", "HOOD", "TSM"]
 
 
 def fetch_symbol_chunked(client, symbol, start, end):
-    """Fetch 1-min bars in 2-week chunks to avoid API limits."""
+    """Request 1-min bars in 2-week slices. Silent on failed chunks — some near the SIP cutoff just error."""
     all_dfs = []
     current = start
     chunk_days = 14  # 2 weeks at a time
@@ -66,7 +67,7 @@ def fetch_symbol_chunked(client, symbol, start, end):
 
 
 def clean_and_resample(df, symbol):
-    """Clean 1-min data, resample to 5-min, convert to ET."""
+    """Resample 1-min bars to 5-min, convert to ET, filter to regular hours, drop junk rows."""
     df = df.copy()
     df = df.rename(columns={
         'timestamp': 'Date', 'open': 'Open', 'high': 'High',
@@ -102,7 +103,7 @@ def clean_and_resample(df, symbol):
 
 
 def add_derived(df, or_minutes=20):
-    """Add all derived columns."""
+    """Compute VWAP, opening range, prev-day levels, and relative volume. Same logic as fetch_alpaca_data."""
     df = df.copy()
 
     # VWAP
@@ -148,7 +149,7 @@ def add_derived(df, or_minutes=20):
 
 
 def build_max_dataset():
-    """Fetch maximum history for all symbols."""
+    """Fetch, clean, and cache the full history for the whole universe. Skips symbols already on disk."""
     client = StockHistoricalDataClient(API_KEY, SECRET_KEY)
 
     print("=" * 70)
@@ -210,7 +211,7 @@ def build_max_dataset():
 
 
 def load_max_dataset():
-    """Load cached max data."""
+    """Load whatever's cached in DATA_DIR. Returns only symbols that have a parquet file."""
     data = {}
     for symbol in UNIVERSE_LONG + UNIVERSE_SHORT:
         path = DATA_DIR / f"{symbol}.parquet"

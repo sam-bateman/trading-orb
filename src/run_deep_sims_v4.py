@@ -1,16 +1,7 @@
 """
-Deep Strategy Simulations V4 — Direction-neutral optimization.
-
-V3 confirmed: 15-min OR, 0.375 stop, 1.0 target, morning only is the core edge.
-But it's all short-only on 41 days — likely biased.
-
-V4 APPROACH:
-  1. Test both directions with the V3-optimized params
-  2. Test asymmetric params: different target/stop for longs vs shorts
-  3. Test direction-neutral with all V3 filters
-  4. Compare: short-only vs long-only vs both vs asymmetric
-  5. Stress test: what if we flip the dataset? (reverse prices to simulate bull)
-  6. Add "adaptive direction" — only trade direction of the gap
+Tests whether the V3 short bias holds up or if both directions can be made to work.
+V3's 41-day short-only results are likely biased — V4 runs the same params on both sides,
+adds asymmetric target/stop for longs vs shorts, and introduces gap-adaptive direction filtering.
 """
 
 import sys
@@ -30,7 +21,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 
 def generate_signals_v4(df, params):
-    """V4: supports asymmetric long/short params and adaptive direction."""
+    """ORB signals with separate target/stop for longs and shorts, plus optional gap-adaptive direction gating."""
     df = df.copy()
 
     or_minutes = params.get('or_minutes', 15)
@@ -135,7 +126,7 @@ def generate_signals_v4(df, params):
 
 
 def run_sim(data_raw, params):
-    """Run one config."""
+    """Run one config and return a stats dict with long/short split, slippage sensitivity, and outlier check."""
     data = {}
     total_signals = 0
 
@@ -216,6 +207,7 @@ def run_sim(data_raw, params):
 
 
 def main():
+    """Run the V4 grid, print best by direction type and group, and output the overall bulletproof winner."""
     print("=" * 70)
     print("DEEP STRATEGY SIMULATIONS V4 — DIRECTION-NEUTRAL")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

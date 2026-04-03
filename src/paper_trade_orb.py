@@ -1,11 +1,9 @@
 """
-Phase 6: Paper Trading — ORB Strategy
+Live paper trading via Alpaca — same logic as the backtest, real time.
 
-Live paper trading using Alpaca API.
-Uses the exact same signal generation and risk management as the backtest.
-
-Strategy: 20-min OR, 0.75x target, 0.5x stop, 1.2x vol filter,
-          10:00-11:30 AM entries, both directions, $400 risk/trade.
+20-min OR, 0.75x target, 0.5x stop, 1.2x vol filter, entries from
+10:00-11:30 AM ET, both directions. Running at quarter size ($100/trade)
+until I'm confident the live fill quality matches the backtest.
 """
 
 import os
@@ -76,7 +74,7 @@ def log(msg):
 
 
 class ORBPaperTrader:
-    """Live paper trading bot for the ORB strategy."""
+    """Runs the ORB strategy live against Alpaca's paper trading endpoint."""
 
     def __init__(self):
         self.trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
@@ -105,7 +103,7 @@ class ORBPaperTrader:
             f"Buying power: ${float(account.buying_power):,.2f}")
 
     def _fetch_bars(self, symbol, minutes=60) -> pd.DataFrame:
-        """Fetch recent 1-min bars and resample to 5-min."""
+        """Pull recent 1-min bars from Alpaca and resample to 5-min."""
         end = datetime.now()
         start = end - timedelta(minutes=minutes + 30)
 
@@ -140,7 +138,7 @@ class ORBPaperTrader:
         return df
 
     def compute_opening_ranges(self):
-        """Compute 20-min opening range for all symbols."""
+        """Calculate today's 20-min opening range for every symbol in the universe."""
         if self.or_computed:
             return
 
@@ -188,7 +186,7 @@ class ORBPaperTrader:
         log(f"Opening ranges computed for {len(self.opening_ranges)} symbols")
 
     def check_signals(self):
-        """Check all symbols for breakout signals."""
+        """Scan the universe for live breakout signals and enter if criteria are met."""
         if self.halted:
             return
 
@@ -237,7 +235,7 @@ class ORBPaperTrader:
                 pass  # Skip silently on data errors
 
     def _enter_trade(self, symbol, direction, price, or_data, rel_vol):
-        """Execute a trade via Alpaca."""
+        """Size and submit a market order via Alpaca, then track the position internally."""
         or_range = or_data['or_range']
 
         if direction == 1:
@@ -291,7 +289,7 @@ class ORBPaperTrader:
             log(f"ORDER FAILED: {symbol} - {e}")
 
     def check_exits(self):
-        """Check all open positions for exit conditions."""
+        """Check every open position for stop, target, time exit, or breakeven trail."""
         now = datetime.now()
         current_time = now.hour + now.minute / 60
 
@@ -346,7 +344,7 @@ class ORBPaperTrader:
             self._close_trade(pos, exit_price, reason)
 
     def _close_trade(self, pos, exit_price, reason):
-        """Close a position via Alpaca."""
+        """Submit a closing market order and log the trade result."""
         try:
             # Submit closing order
             side = OrderSide.SELL if pos.direction == 1 else OrderSide.BUY
@@ -392,7 +390,7 @@ class ORBPaperTrader:
             log(f"CLOSE FAILED: {pos.symbol} - {e}")
 
     def flatten_all(self):
-        """Close all positions."""
+        """Immediately close everything. Used at end of day or on shutdown."""
         for pos in list(self.positions):
             try:
                 df = self._fetch_bars(pos.symbol, minutes=10)
@@ -403,7 +401,7 @@ class ORBPaperTrader:
         self.positions = []
 
     def new_day(self):
-        """Reset daily state."""
+        """Clear all daily counters and open range data at the start of each session."""
         self.daily_pnl = 0.0
         self.daily_trades = 0
         self.daily_signals = 0
@@ -418,7 +416,7 @@ class ORBPaperTrader:
         self._show_account()
 
     def run(self):
-        """Main loop."""
+        """Main event loop — runs all day, checks signals and exits every 30 seconds."""
         log("\n" + "=" * 60)
         log("ORB PAPER TRADER — PHASE 6")
         log("=" * 60)

@@ -1,15 +1,7 @@
 """
-Deep Strategy Simulations V5 — Refinements based on V4 chart patterns.
-
-NEW VARIABLES:
-  1. Day-of-week filter (Wed/Thu only, or exclude Mon/Fri)
-  2. Tighter entry window (10:10-10:50 vs 10:00-11:30)
-  3. Ticker exclusion (remove CRM, UNH, GOOGL)
-  4. Longs only on gap-up days, shorts only on gap-down days
-  5. Momentum confirmation (last N bars in breakout direction)
-  6. Previous day range filter (narrow prev day = better breakouts)
-  7. OR width relative to prev day range (coiled spring detection)
-  8. Higher risk on high-conviction setups
+Chart-driven refinements on the V4 asymmetric base.
+New filters: day-of-week, tighter entry windows, ticker exclusion, gap direction match,
+momentum confirmation bars, and coiled spring detection via OR-to-prev-range ratio.
 """
 
 import sys
@@ -31,7 +23,7 @@ EXCLUDE_TICKERS = {"CRM", "UNH", "GOOGL"}
 
 
 def generate_signals_v5(df, params):
-    """V5 signal generation with all refinements."""
+    """V4 asymmetric ORB with day-of-week filter, momentum confirmation, and coiled-spring detection added."""
     df = df.copy()
 
     or_minutes = params.get('or_minutes', 12)
@@ -167,7 +159,7 @@ def generate_signals_v5(df, params):
 
 
 def run_sim(data_raw, params, exclude_tickers=None):
-    """Run one config."""
+    """Run one config, optionally skipping certain tickers, and return the stats dict."""
     data = {}
     total_signals = 0
 
@@ -241,6 +233,7 @@ def run_sim(data_raw, params, exclude_tickers=None):
 
 
 def main():
+    """Run the V5 config grid, print best by group, and show the full V1-V5 progression at the end."""
     print("=" * 70)
     print("DEEP STRATEGY SIMULATIONS V5 — CHART-DRIVEN REFINEMENTS")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

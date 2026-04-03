@@ -1,16 +1,7 @@
 """
-Deep Strategy Simulations — Sweep across many more variables.
-
-Building on Variant C (morning only) as the base since it had the best Sharpe.
-Now testing:
-  - OR period: 15min, 30min, 45min
-  - Target multipliers: 0.5x, 0.75x, 1.0x, 1.25x, 1.5x, 2.0x
-  - Stop multipliers: 0.25x, 0.5x, 0.75x, 1.0x
-  - Volume threshold: 1.0x, 1.2x, 1.5x, 2.0x
-  - Entry window: 10:00-11:30, 10:00-12:00, 10:00-14:00, 10:30-11:30
-  - Risk per trade: $100, $200, $300, $500
-  - Position cap: 3, 5, 8 simultaneous
-  - With/without trailing stop to breakeven
+First big parameter sweep — ~1,000+ combos across OR period, target/stop multiples,
+volume threshold, entry window, risk per trade, and position cap.
+Starting from Variant C (morning only) as the base since it had the best Sharpe.
 """
 
 import sys
@@ -32,7 +23,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 def generate_signals_parametric(df, target_mult, stop_mult, vol_thresh,
                                  entry_start, entry_end, or_minutes=30):
-    """Fully parameterized signal generation."""
+    """Standard ORB signal generation with all parameters exposed. Recomputes OR if period differs from 30 min."""
     df = df.copy()
 
     # Recompute OR if different period
@@ -102,7 +93,7 @@ def generate_signals_parametric(df, target_mult, stop_mult, vol_thresh,
 
 
 def run_single_sim(data_raw, params):
-    """Run one parameter combination. Returns stats dict."""
+    """Run one parameter combination and return a stats dict, or None if there are no trades."""
     data = {}
     total_signals = 0
 
@@ -179,6 +170,7 @@ def run_single_sim(data_raw, params):
 
 
 def main():
+    """Build the parameter grid, run every combo, filter to robust results, and print the top 20."""
     print("=" * 70)
     print("DEEP STRATEGY SIMULATIONS")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

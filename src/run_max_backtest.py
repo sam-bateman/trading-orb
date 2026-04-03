@@ -1,6 +1,6 @@
 """
-Run the walk-forward validated strategy on maximum data (2016-2026).
-This is the definitive test across bull runs, bear markets, COVID, meme era, etc.
+The definitive stress test: run the walk-forward validated config on the full 10-year dataset.
+Covers bull runs, COVID crash, meme mania, rate hike cycle, and everything in between.
 """
 
 import sys
@@ -31,6 +31,7 @@ PARAMS = {
 
 
 def main():
+    """Load max history, generate signals with the validated params, run the backtest, and print a full report."""
     print("=" * 70)
     print("MAXIMUM HISTORY BACKTEST (2016-2026)")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

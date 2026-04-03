@@ -1,14 +1,9 @@
 """
-Phase 2: Intraday Data Pipeline
+Intraday data pipeline — fetch, clean, and enrich 5-min OHLCV bars.
 
-Clean, reliable data pipeline for backtesting intraday strategies.
-Downloads, cleans, validates, and stores intraday OHLCV bars.
-Provides resampling and derived columns (VWAP, opening range, etc.).
-
-Structured as an importable module, not a script.
-
-Data source: yfinance (5-min bars, ~59 days). For 1-min bars with
-longer history, set POLYGON_API_KEY env var to use polygon.io.
+Uses yfinance by default (~59 days of 5-min bars). Set POLYGON_API_KEY
+to pull 1-min history from polygon.io instead. Designed to be imported,
+not run directly (though running it will refresh the cache).
 """
 
 import os
@@ -41,8 +36,7 @@ def fetch_intraday_yfinance(
     interval: str = "5m",
     days: int = 59,
 ) -> pd.DataFrame:
-    """Fetch intraday bars from Yahoo Finance.
-    5m bars: ~59 days max. 1m bars: ~7 days max."""
+    """Pull intraday bars from Yahoo Finance (5m: ~59 days max, 1m: ~7 days)."""
     end = datetime.now()
     start = end - timedelta(days=days)
 
@@ -75,7 +69,7 @@ def fetch_intraday_polygon(
     interval: str = "1m",
     days: int = 365,
 ) -> pd.DataFrame:
-    """Fetch 1-minute bars from Polygon.io (requires API key)."""
+    """Pull 1-min bars from Polygon.io. Needs POLYGON_API_KEY in env."""
     api_key = os.environ.get('POLYGON_API_KEY')
     if not api_key:
         raise ValueError("Set POLYGON_API_KEY environment variable")
@@ -133,7 +127,7 @@ def fetch_intraday(
     days: int = 59,
     source: str = "auto",
 ) -> pd.DataFrame:
-    """Fetch intraday data from the best available source."""
+    """Fetch from Polygon if the key is set and interval is 1m, otherwise yfinance."""
     if source == "auto":
         if os.environ.get('POLYGON_API_KEY') and interval == "1m":
             source = "polygon"
@@ -151,7 +145,7 @@ def fetch_intraday(
 # ============================================================
 
 def clean_intraday(df: pd.DataFrame, symbol: str = "") -> Tuple[pd.DataFrame, dict]:
-    """Clean intraday data. Returns (cleaned_df, quality_report)."""
+    """Strip bad bars and convert to ET. Returns (cleaned_df, quality_report)."""
     report = {
         "symbol": symbol,
         "raw_bars": len(df),
@@ -246,14 +240,14 @@ def clean_intraday(df: pd.DataFrame, symbol: str = "") -> Tuple[pd.DataFrame, di
 # ============================================================
 
 def save_parquet(df: pd.DataFrame, symbol: str):
-    """Save cleaned data as parquet."""
+    """Write a symbol's DataFrame to the parquet cache."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     path = DATA_DIR / f"{symbol}.parquet"
     df.to_parquet(path, index=False)
 
 
 def load_parquet(symbol: str) -> Optional[pd.DataFrame]:
-    """Load data from parquet cache."""
+    """Load a symbol from the parquet cache, or None if it doesn't exist yet."""
     path = DATA_DIR / f"{symbol}.parquet"
     if path.exists():
         return pd.read_parquet(path)
@@ -265,8 +259,7 @@ def load_parquet(symbol: str) -> Optional[pd.DataFrame]:
 # ============================================================
 
 def resample_bars(df: pd.DataFrame, timeframe: str = "15min") -> pd.DataFrame:
-    """Aggregate bars to a higher timeframe.
-    Supports: '5min', '15min', '30min', '1h', etc."""
+    """Aggregate to a higher timeframe (e.g. '15min', '30min', '1h')."""
     df = df.copy()
     df = df.set_index('Date')
 
@@ -299,7 +292,7 @@ def resample_bars(df: pd.DataFrame, timeframe: str = "15min") -> pd.DataFrame:
 # ============================================================
 
 def add_vwap(df: pd.DataFrame) -> pd.DataFrame:
-    """Add intraday VWAP (resets each day)."""
+    """Compute intraday VWAP, reset each day."""
     df = df.copy()
     df['typical_price'] = (df['High'] + df['Low'] + df['Close']) / 3
     df['tp_vol'] = df['typical_price'] * df['Volume']
@@ -313,22 +306,21 @@ def add_vwap(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_cumulative_volume(df: pd.DataFrame) -> pd.DataFrame:
-    """Add cumulative volume within each day."""
+    """Add a running volume total that resets each day."""
     df = df.copy()
     df['cum_volume'] = df.groupby('trading_day')['Volume'].cumsum()
     return df
 
 
 def add_time_bucket(df: pd.DataFrame) -> pd.DataFrame:
-    """Add 15-minute time bucket label."""
+    """Label each bar with its 15-minute bucket (e.g. '10:00')."""
     df = df.copy()
     df['time_bucket'] = df['Date'].dt.floor('15min').dt.strftime('%H:%M')
     return df
 
 
 def add_opening_range(df: pd.DataFrame, minutes: int = 30) -> pd.DataFrame:
-    """Add opening range (first N minutes) high/low for each day.
-    Default is 30-minute opening range."""
+    """Compute the first N-minute high/low for each day and join it back in."""
     df = df.copy()
 
     cutoff_time = 9.5 + (minutes / 60)  # 9:30 + N minutes
@@ -351,7 +343,7 @@ def add_opening_range(df: pd.DataFrame, minutes: int = 30) -> pd.DataFrame:
 
 
 def add_prev_day_levels(df: pd.DataFrame) -> pd.DataFrame:
-    """Add previous day's high, low, close, and VWAP."""
+    """Add prior session's high, low, close, and volume to every bar."""
     df = df.copy()
 
     daily = df.groupby('trading_day').agg(
@@ -373,7 +365,7 @@ def add_prev_day_levels(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_relative_volume(df: pd.DataFrame, lookback_days: int = 20) -> pd.DataFrame:
-    """Add relative volume vs. same time-of-day average over lookback period."""
+    """Compare each bar's volume to its 20-day rolling average at that same time of day."""
     df = df.copy()
 
     # Get average volume by time bucket over the lookback
@@ -388,7 +380,7 @@ def add_relative_volume(df: pd.DataFrame, lookback_days: int = 20) -> pd.DataFra
 
 
 def add_all_derived(df: pd.DataFrame, or_minutes: int = 30) -> pd.DataFrame:
-    """Add all derived columns at once."""
+    """Run all the enrichment steps in one shot."""
     df = add_vwap(df)
     df = add_cumulative_volume(df)
     df = add_time_bucket(df)
@@ -408,8 +400,10 @@ def build_dataset(
     days: int = 59,
     force_refresh: bool = False,
 ) -> Tuple[Dict[str, pd.DataFrame], list]:
-    """Full pipeline: fetch, clean, derive, store for all symbols.
-    Returns (data_dict, quality_reports)."""
+    """
+    Full pipeline for a list of symbols: fetch, clean, enrich, save.
+    Returns (data_dict, quality_reports). Uses cache unless force_refresh=True.
+    """
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -484,7 +478,7 @@ def build_dataset(
 # ============================================================
 
 def load_dataset(symbols: List[str] = DEFAULT_UNIVERSE) -> Dict[str, pd.DataFrame]:
-    """Load all symbols from parquet cache."""
+    """Load the full symbol set from parquet. Skips anything not yet cached."""
     data = {}
     for symbol in symbols:
         df = load_parquet(symbol)
@@ -498,7 +492,7 @@ def get_symbol_data(
     timeframe: str = "5min",
     with_derived: bool = True,
 ) -> pd.DataFrame:
-    """Get data for a single symbol, optionally resampled."""
+    """Load one symbol from cache, optionally resampled and re-enriched."""
     df = load_parquet(symbol)
     if df is None:
         raise ValueError(f"No cached data for {symbol}. Run build_dataset() first.")

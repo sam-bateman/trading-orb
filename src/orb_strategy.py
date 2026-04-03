@@ -1,29 +1,9 @@
 """
-Phase 3: Opening Range Breakout (ORB) Strategy
+Opening Range Breakout signal generation.
 
-HYPOTHESIS: Stocks that break above/below their first 30-minute range
-with above-average volume tend to continue in that direction for a
-meaningful portion of the day's remaining range.
-
-ENTRY:
-  - Price closes above 30-min opening range high (long) or below low (short)
-  - Volume on the breakout bar is >= 1.2x average for that time of day
-  - Must occur between 10:00 AM and 2:30 PM ET (avoid opening chaos and close)
-  - Only take the FIRST breakout of the day per direction
-
-EXIT:
-  - Target: 1.5x the opening range width from entry
-  - Stop: 0.75x the opening range width against the entry (2:1 R:R)
-  - Time: Close all positions by 3:45 PM ET
-  - Trail: Once 1x OR in profit, move stop to breakeven
-
-WHY THESE PARAMETERS:
-  - 30-min OR: Standard institutional reference. 15-min is too noisy, 1-hour too late.
-  - 1.2x volume: Confirms real participation, not just a wick. Not too high to miss trades.
-  - 1.5x target: Gives room to run. Phase 1 showed most names have 2-3% daily range vs 1.5-2% OR.
-  - 0.75x stop: Tight enough for 2:1 R:R but allows for normal retest of the OR boundary.
-  - 10:00 AM start: Avoids first 30 min of noise/gap fills. OR is fully formed.
-  - 2:30 PM cutoff: Need time for the move to play out before close.
+Hypothesis: stocks that break the first 30-min range with volume behind
+them tend to keep going. Entry on close above/below OR with 1.2x rel vol,
+target 1.5x OR range, stop 0.75x (2:1 R:R). Morning session only.
 """
 
 import numpy as np
@@ -40,18 +20,12 @@ OUTPUT_DIR = Path(__file__).parent.parent / "phase3_output"
 
 def generate_orb_signals(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Generate Opening Range Breakout signals for a single symbol.
+    Tag each bar with a signal if it triggers an ORB entry.
 
-    Input: DataFrame with columns from intraday_data pipeline
-           (must have: Close, High, Low, Volume, or_high, or_low,
-            or_range, time_decimal, trading_day, rel_volume)
-
-    Output: Same DataFrame with added signal columns:
-        - signal: 1 (long), -1 (short), 0 (no signal)
-        - signal_type: 'long_breakout', 'short_breakout', None
-        - target_price: profit target
-        - stop_price: stop loss
-        - entry_reason: human-readable reason
+    Expects the standard intraday pipeline columns (or_high, or_low,
+    or_range, rel_volume, time_decimal, trading_day). Returns the same
+    DataFrame with signal, signal_type, target_price, stop_price, and
+    entry_reason columns added.
     """
     df = df.copy()
 
@@ -147,8 +121,8 @@ def generate_orb_signals(df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 
 def compute_orb_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Compute features relevant to the ORB strategy.
-    These are for analysis and potential ML enhancement later."""
+    """Add ORB-relevant features (VWAP distance, momentum, vol surge, gap %).
+    Mostly for analysis; could be used for ML filtering down the road."""
     df = df.copy()
 
     # Distance from VWAP (mean reversion pressure)
@@ -190,7 +164,7 @@ def compute_orb_features(df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 
 def plot_signal_examples(df: pd.DataFrame, symbol: str, n_examples: int = 3):
-    """Plot specific examples of ORB signals with charts."""
+    """Save a few example signal charts to disk for a quick sanity check."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -274,7 +248,7 @@ def plot_signal_examples(df: pd.DataFrame, symbol: str, n_examples: int = 3):
 # ============================================================
 
 def run_phase3(symbols: list = None):
-    """Run Phase 3: Generate signals and visual examples."""
+    """Generate ORB signals for all symbols and save example charts."""
     import sys
     sys.path.insert(0, str(Path(__file__).parent))
     from intraday_data import load_dataset, DEFAULT_UNIVERSE
