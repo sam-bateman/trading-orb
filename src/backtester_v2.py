@@ -1,24 +1,9 @@
 """
-Phase 4: Realistic Event-Driven Backtester
+Event-driven backtester — processes bars one at a time, no lookahead.
 
-Processes bars one at a time. No lookahead bias.
-
-Execution model:
-  - Slippage: $0.01/share entry and exit
-  - Commission: $0.005/share
-  - Fills at NEXT bar's open (not signal bar's close)
-  - No trading first/last 5 minutes of day
-
-Position sizing:
-  - Fixed dollar risk per trade ($200 default)
-  - Size = risk / distance_to_stop
-  - Max 5% of account or $50K notional
-
-Risk management:
-  - Max 3 open positions
-  - Max 1 trade per ticker per day (no re-entry after stop)
-  - Daily loss limit: stop if down > $600
-  - Flatten everything by 3:50 PM
+Fills happen at the next bar's open. Slippage is $0.01/share each way,
+commission $0.005/share. Fixed dollar risk sizing, max 3 positions, one
+trade per ticker per day, $600 daily loss limit, flatten by 3:50 PM ET.
 """
 
 import numpy as np
@@ -64,7 +49,7 @@ class DayState:
 
 
 class Backtester:
-    """Event-driven backtester with realistic execution."""
+    """Bar-by-bar backtester. Fills on next open, realistic costs."""
 
     def __init__(
         self,
@@ -109,12 +94,12 @@ class Backtester:
         self.equity_curve = []
 
     def _new_day(self, date):
-        """Initialize state for a new trading day."""
+        """Reset per-day state at the start of each trading day."""
         self.day_state = DayState(date=date)
         self.pending_entries = []
 
     def _calc_position_size(self, entry_price: float, stop_price: float) -> int:
-        """Calculate shares based on fixed dollar risk."""
+        """Size the position so we risk exactly risk_per_trade dollars, capped by notional limits."""
         risk_per_share = abs(entry_price - stop_price)
         if risk_per_share <= 0:
             return 0
@@ -134,14 +119,14 @@ class Backtester:
         return max(shares, 0)
 
     def _apply_slippage(self, price: float, direction: int, is_entry: bool) -> float:
-        """Apply slippage. Entry slippage goes against you, exit slippage goes against you."""
+        """Shift price by slippage amount — always in the direction that hurts us."""
         if is_entry:
             return price + (self.slippage * direction)  # Buy higher, sell lower
         else:
             return price - (self.slippage * direction)  # Exit: reverse
 
     def _close_position(self, trade: Trade, exit_price: float, exit_time, reason: str, bar_idx: int):
-        """Close a position and record the trade."""
+        """Apply exit slippage, compute gross/net PnL, update capital and day state."""
         # Apply slippage to exit
         fill_price = self._apply_slippage(exit_price, trade.direction, is_entry=False)
 
@@ -168,7 +153,7 @@ class Backtester:
         self.closed_trades.append(trade)
 
     def _check_exits(self, bar: pd.Series, bar_idx: int):
-        """Check all open positions for exit conditions."""
+        """Check time exit, stop loss, target, and breakeven trail for every open position."""
         to_close = []
 
         for i, trade in enumerate(self.open_positions):
@@ -218,7 +203,7 @@ class Backtester:
             self._close_position(trade, exit_price, exit_time, reason, bar_idx)
 
     def _check_entries(self, bar: pd.Series):
-        """Process pending entry orders. Fills at this bar's open."""
+        """Fill any pending orders at this bar's open, subject to all risk filters."""
         if not self.pending_entries:
             return
 
@@ -284,7 +269,7 @@ class Backtester:
             self.pending_entries.pop(i)
 
     def _queue_entry(self, signal_bar: pd.Series):
-        """Queue an entry for next bar fill."""
+        """Stage an entry to be filled at the next bar's open."""
         self.pending_entries.append({
             'symbol': signal_bar.get('symbol', ''),
             'direction': int(signal_bar['signal']),
@@ -295,13 +280,9 @@ class Backtester:
         })
 
     def run(self, data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
-        """Run backtest across all symbols.
-
-        Args:
-            data: dict of symbol -> DataFrame with signal columns from orb_strategy
-
-        Returns:
-            DataFrame of all closed trades
+        """
+        Run the backtest. Pass in a dict of symbol -> DataFrame (with signal columns).
+        Returns a DataFrame of all closed trades.
         """
         self._reset()
 
@@ -401,9 +382,9 @@ class Backtester:
 
 def inspect_trades(trade_log: pd.DataFrame, data: Dict[str, pd.DataFrame], n: int = 10,
                    category: str = "random_winners"):
-    """Plot individual trades for visual inspection.
-
-    category: 'random_winners', 'random_losers', 'worst'
+    """
+    Plot a sample of individual trades overlaid on the day's price action.
+    category: 'random_winners', 'random_losers', or 'worst'
     """
     import matplotlib
     matplotlib.use('Agg')
@@ -505,7 +486,7 @@ def inspect_trades(trade_log: pd.DataFrame, data: Dict[str, pd.DataFrame], n: in
 # ============================================================
 
 def run_phase4():
-    """Run Phase 4: Backtest with trade inspection."""
+    """Load signals, run the backtester, print stats, and save trade charts."""
     import sys
     sys.path.insert(0, str(Path(__file__).parent))
     from intraday_data import load_dataset, DEFAULT_UNIVERSE

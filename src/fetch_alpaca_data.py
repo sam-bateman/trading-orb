@@ -1,6 +1,6 @@
 """
-Fetch 12 months of 5-minute intraday bars from Alpaca for all 20 stocks.
-Cleans, validates, and stores as parquet — same format as intraday_data.py.
+Pull 12 months of 5-min bars from Alpaca for the full universe.
+Cleans and stores as parquet in the same format as intraday_data.py.
 """
 
 import numpy as np
@@ -32,7 +32,7 @@ UNIVERSE = [
 
 
 def fetch_symbol(client, symbol: str, start: datetime, end: datetime) -> pd.DataFrame:
-    """Fetch 5-min bars for one symbol in monthly chunks."""
+    """Download minute bars for one symbol in 30-day chunks (avoids API timeouts)."""
     all_dfs = []
     current = start
 
@@ -65,7 +65,7 @@ def fetch_symbol(client, symbol: str, start: datetime, end: datetime) -> pd.Data
 
 
 def clean_alpaca_data(df: pd.DataFrame, symbol: str) -> Tuple[pd.DataFrame, dict]:
-    """Clean Alpaca data to match intraday_data.py format."""
+    """Resample to 5-min, convert to ET, remove bad bars, match intraday_data column layout."""
     report = {"symbol": symbol, "raw_bars": len(df), "issues": []}
 
     df = df.copy()
@@ -134,7 +134,7 @@ def clean_alpaca_data(df: pd.DataFrame, symbol: str) -> Tuple[pd.DataFrame, dict
 
 
 def add_derived_columns(df: pd.DataFrame, or_minutes: int = 12) -> pd.DataFrame:
-    """Add VWAP, opening range, prev day levels, relative volume."""
+    """Tack on VWAP, opening range, prev-day levels, and relative volume."""
     df = df.copy()
 
     # VWAP
@@ -184,7 +184,7 @@ def add_derived_columns(df: pd.DataFrame, or_minutes: int = 12) -> pd.DataFrame:
 
 
 def build_12m_dataset(months: int = 12):
-    """Fetch and build full 12-month dataset."""
+    """Fetch, clean, and cache 12 months of data for the whole universe."""
     client = StockHistoricalDataClient(API_KEY, SECRET_KEY)
 
     end = datetime.now()
@@ -244,7 +244,7 @@ def build_12m_dataset(months: int = 12):
 
 
 def load_12m_dataset() -> Dict[str, pd.DataFrame]:
-    """Load cached 12-month data."""
+    """Load whatever's already been cached in DATA_DIR. No fetching."""
     data = {}
     for symbol in UNIVERSE:
         path = DATA_DIR / f"{symbol}.parquet"

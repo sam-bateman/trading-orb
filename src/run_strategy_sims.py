@@ -1,13 +1,7 @@
 """
-Strategy Simulations — Test multiple ORB variants based on Phase 5 findings.
-
-Variants:
-  A: Original ORB (baseline — already know it loses)
-  B: Tight target (0.75x OR), tighter stop (0.5x OR) — higher win rate
-  C: Morning only (10:00-11:30 AM entries) — best hour was 11 AM
-  D: No midday (skip 12:00-1:00 PM) + tight target
-  E: VWAP mean reversion — different hypothesis entirely
-  F: Best combo: morning only + tight target + volume filter 1.5x
+Six ORB variants side by side, based on what Phase 5 flagged as worth exploring.
+A is the original baseline. B through D tighten the parameters. E is a completely
+different hypothesis (VWAP mean reversion). F is the morning-only combo that looked best.
 """
 
 import sys
@@ -31,7 +25,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 # ============================================================
 
 def generate_signals_variant(df, variant="A"):
-    """Generate signals for different strategy variants."""
+    """Generate ORB signals for the given variant letter. Dispatches to VWAP reversion for variant E."""
     df = df.copy()
     df['signal'] = 0
     df['signal_type'] = None
@@ -127,13 +121,8 @@ def generate_signals_variant(df, variant="A"):
 
 
 def _generate_vwap_reversion(df):
-    """Variant E: Mean reversion when price is overextended from VWAP.
-
-    ENTRY: Price > 1.5% above VWAP (short) or < 1.5% below VWAP (long)
-           during 10:30 AM - 2:30 PM, with declining relative volume < 0.8
-    TARGET: Return to VWAP
-    STOP: 0.5% beyond entry (tight, since we expect quick reversion)
-    """
+    """Variant E: Short when price is >1% above VWAP with declining volume, long when >1% below.
+    Target is return to VWAP. Stop is 0.5% beyond entry."""
     df = df.copy()
     df['signal'] = 0
     df['signal_type'] = None
@@ -201,7 +190,7 @@ def _generate_vwap_reversion(df):
 # ============================================================
 
 def run_all_sims():
-    """Run all strategy variants and compare."""
+    """Run all six variants, print a comparison table, and flag the winner."""
     print("=" * 70)
     print("STRATEGY SIMULATIONS — 6 VARIANTS")
     print("=" * 70)

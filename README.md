@@ -1,97 +1,53 @@
-# Intraday Opening Range Breakout (ORB) Strategy
+# Intraday Opening Range Breakout Strategy
 
-A rigorously tested intraday trading strategy that trades breakouts from the first 20 minutes of the trading day. Walk-forward validated on 10 years of data (2016-2026) across 20 liquid US stocks.
+I built this over several months as a serious attempt to develop a systematic intraday strategy that actually holds up under scrutiny. The core idea is simple: trade breakouts from the first 20 minutes of the session. What made this interesting was the process — I ran around 8,000 parameter combinations, discovered my initial results were overfit to a tiny 41-day window, rebuilt everything on 12 months of data, and eventually validated the whole thing on 10 years of 5-minute bars (3.47M rows). Every year from 2016 to 2026 was profitable. I wasn't expecting that.
 
-## Strategy Summary
+## What the strategy does
 
-| Parameter | Value |
-|---|---|
-| Opening Range | First 20 minutes (9:30-9:50 AM ET) |
-| Entry Window | 10:00 - 11:30 AM ET |
-| Direction | Both (long breakouts + short breakdowns) |
-| Volume Filter | 1.2x relative volume required |
-| Target | 0.75x OR range |
-| Stop Loss | 0.50x OR range (1.5:1 reward/risk) |
-| Trailing Stop | Breakeven after 1x OR profit |
-| Time Exit | Flatten all by 3:50 PM |
-| Max Positions | 3 simultaneous |
+The opening range is defined as the high and low from 9:30 to 9:50 AM ET. If price breaks above that high with enough volume behind it, I go long. If it breaks below the low, I go short. Entries are only valid between 10:00 and 11:30 AM — after that, I leave it alone. Everything gets flattened by 3:50 PM, no overnight holds.
 
-## 10-Year Backtest Results (2016-2026)
+The target is 0.75x the opening range width, the stop is 0.50x, so the reward/risk is 1.5:1. After price hits 1x the range in my favor, the stop trails to breakeven. I hold up to 3 positions at a time. Volume filter requires 1.2x relative volume on the breakout bar — this turned out to be the most important part.
 
-| Metric | Value |
-|---|---|
-| Total Trades | 4,292 |
-| Win Rate | 50.3% |
-| Net PnL | +$30,989 ($400 risk/trade) |
-| Annualized Return | +4.8% |
-| Profit Factor | 1.31 |
-| Sharpe Ratio | 2.47 |
-| Max Drawdown | $1,271 |
-| Calmar Ratio | 24.39 |
-| Beta to SPY | -0.004 (market neutral) |
-| Profitable Years | 11/11 (100%) |
-| Profitable Months | 91/122 (75%) |
-| Profitable Tickers | 19/20 (95%) |
-| Monte Carlo (10k trials) | 100% profitable |
-| Survives 3x slippage | Yes |
+## Results (10-year backtest, 2016–2026)
 
-## How It Was Built
+4,292 trades across 20 stocks. Win rate of 50.3%, which sounds mediocre until you look at the rest of the numbers. Net PnL of +$30,989 at $400 risk per trade, annualized return of 4.8%, profit factor of 1.31, Sharpe of 2.47, max drawdown of $1,271, Calmar ratio of 24.39. Beta to SPY is essentially zero (-0.004). 19 out of 20 tickers were profitable. 75% of months were profitable. 100% of Monte Carlo trials (10,000) finished positive. The strategy survives 3x the slippage assumptions I used in the backtest.
 
-This strategy was developed using a systematic, multi-phase process designed to prevent overfitting:
+The drawdown number is the thing I keep coming back to. $1,271 max drawdown on ~$31k of gains over a decade is almost too good, which is why I spent a lot of time trying to break it.
 
-### Phase 1: Universe Selection
-Screened 150+ stocks for intraday tradability (volume, volatility, spread). Selected 20 names. Analyzed intraday volume profiles, range by hour, and autocorrelation structure to determine strategy direction (trend-following vs mean-reversion).
+## How I built it
 
-### Phase 2: Data Pipeline
-Built a clean data pipeline with timezone handling, gap detection, validation, and derived columns (VWAP, opening range, relative volume, previous day levels).
+**Universe selection.** Started by screening 150+ stocks for intraday tradability — volume, volatility, bid-ask spread. Narrowed to 20 names. Before writing a single line of strategy code, I analyzed intraday volume profiles and autocorrelation structure to figure out whether ORB would be trend-following or mean-reverting on these stocks.
 
-### Phase 3: Strategy Hypothesis
-Defined the Opening Range Breakout hypothesis with precise entry/exit logic. Generated signals and visually inspected example trades before backtesting.
+**Data pipeline.** Built a clean pipeline in `intraday_data.py` to handle timezone weirdness, detect gaps, validate the data, and derive the columns I needed: VWAP, opening range, relative volume, previous-day levels.
 
-### Phase 4: Realistic Backtesting
-Event-driven backtester with $0.01/share slippage, $0.005/share commission, next-bar fills, position sizing based on fixed dollar risk, daily loss limits, and no overnight holds.
+**Backtester.** Event-driven, not vectorized. $0.01/share slippage, $0.005/share commission, fills on the next bar after signal, position sizing based on fixed dollar risk ($400), daily loss limits. I was deliberate about making the assumptions conservative rather than optimistic.
 
-### Phase 5: Statistical Validation
-Full validation suite: PnL distribution, robustness checks (half-split, remove top 5 trades, increase slippage, timing sensitivity), Monte Carlo simulation (10,000 trials).
+**Optimization — and where it almost went wrong.** I ran 5 rounds of optimization on Yahoo Finance data. V1 found that morning-only entries outperformed (Sharpe 4.02). V2 discovered short-only dominated on that sample (Sharpe 7.19). V3 pushed further with ultra-fine stop tuning (Sharpe 8.27). The numbers looked great. Then I realized I was optimizing on 41 trading days, which is nowhere near enough data to trust anything.
 
-### Optimization Iterations (V1-V5)
-Ran ~8,000 parameter combinations across 5 rounds on 41 days of Yahoo data:
-- **V1**: Found morning-only entries outperform (Sharpe 4.02)
-- **V2**: Found short-only dominates on 41 days (Sharpe 7.19)
-- **V3**: Ultra-fine-tuned stops (Sharpe 8.27)
-- **V4**: Added both directions with asymmetric params
-- **V5**: Identified potential overfitting to 41-day window
+When I pulled 12 months of Alpaca data and tested out-of-sample, the strategy degraded significantly. That was the right outcome — it meant my validation process was working. I added the volume filter, re-optimized using walk-forward validation (train on months 1–6, test on months 7–12), and the test period actually outperformed training. That gave me enough confidence to pull the full 10 years.
 
-### The Critical Test
-Recognized that 41 days was insufficient. Pulled 12 months of data from Alpaca — strategy degraded significantly. Then added volatility filter (1.2x relative volume) and re-optimized with walk-forward validation (train on months 1-6, test on months 7-12). Test period outperformed training period.
+**10-year validation.** I ran all 11 robustness checks with zero parameter changes: half-split, removing the top 5 trades, 3x slippage, timing sensitivity, the works. Everything held up.
 
-### Maximum History Validation
-Pulled 10 years of 5-minute data from Alpaca (3.47M bars). Strategy passed all 11 robustness checks with no modifications. Every single year from 2016-2026 was profitable.
+## The actual edge
 
-## Key Insight
+The volume filter. Without it, ORB breakouts are basically a coin flip. Requiring 1.2x above-average volume on the breakout bar filters out the weak and fake moves and selects for breakouts with real institutional participation. I found this empirically — the strategy without the filter is mediocre, the strategy with it is consistent. That's the kind of single insight that makes the whole thing feel worth the time.
 
-The volume filter is the edge. Without it, breakouts are a coin flip. Requiring 1.2x above-average volume on the breakout bar filters out weak/fake breakouts and only enters when there's institutional participation behind the move.
-
-## Project Structure
+## Project layout
 
 ```
 src/
-  # Data Pipeline
   fetch_alpaca_data.py      # Fetch intraday data from Alpaca (12 months)
   fetch_max_data.py         # Fetch max history (10 years)
   intraday_data.py          # Clean, validate, enrich intraday data
   phase1_screener.py        # Stock universe screening
 
-  # Strategy
   orb_strategy.py           # Signal generation + feature engineering
 
-  # Backtesting
   backtester_v2.py          # Event-driven backtester with realistic execution
   run_12m_backtest.py       # 12-month backtest
   run_max_backtest.py       # 10-year backtest
   run_12m_optimization.py   # Walk-forward optimization
 
-  # Optimization
   run_strategy_sims.py      # V1: 6 strategy variants
   run_deep_sims.py          # V1: 3,000+ parameter sweep
   run_deep_sims_v2.py       # V2: Short-only discovery
@@ -99,10 +55,8 @@ src/
   run_deep_sims_v4.py       # V4: Direction-neutral
   run_deep_sims_v5.py       # V5: Chart-driven refinements
 
-  # Live Trading
   paper_trade_orb.py        # Alpaca paper trading bot
 
-  # Reports
   generate_report.py        # V1 report
   generate_report_v4.py     # V4 report
   generate_final_report.py  # Final 12-month report
@@ -117,26 +71,26 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Set your Alpaca API keys in `src/paper_trade_orb.py` or as environment variables.
+You'll need Alpaca API keys. Set them as environment variables or drop them into `src/paper_trade_orb.py` directly.
 
-## Usage
+## Running it
 
-### Fetch Data
+Fetch 10 years of data:
 ```bash
 python src/fetch_max_data.py
 ```
 
-### Run 10-Year Backtest
+Run the full backtest:
 ```bash
 python src/run_max_backtest.py
 ```
 
-### Paper Trade
+Paper trade live:
 ```bash
 python src/paper_trade_orb.py
 ```
 
-### Monitor
+Watch what it's doing:
 ```bash
 tail -f paper_trade_orb.log
 cat paper_trade_logs/trade_log.json
@@ -144,6 +98,4 @@ cat paper_trade_logs/trade_log.json
 
 ## Disclaimer
 
-This is not financial advice. This project is for educational and research purposes only. Trading involves substantial risk of loss. Past performance, including backtested performance, does not guarantee future results. Never trade money you can't afford to lose.
-
-The strategy was developed and tested using historical data. Real-world execution may differ due to slippage, latency, partial fills, and changing market conditions. Always paper trade extensively before risking real capital.
+Not financial advice. This is a research project. Trading real money involves real risk of loss, and backtested results don't guarantee anything about live performance — slippage, latency, partial fills, and regime changes all matter. Paper trade it for a long time before putting real capital behind it.

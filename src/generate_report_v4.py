@@ -1,5 +1,6 @@
 """
-Final Report — V4 Asymmetric ORB Strategy
+Final report for the V4 asymmetric ORB strategy.
+Runs the full stats suite on the V4 trade log and saves charts to report_output/.
 """
 
 import sys

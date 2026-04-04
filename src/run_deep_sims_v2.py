@@ -1,27 +1,7 @@
 """
-Deep Strategy Simulations V2 — Methodical optimization based on V1 findings.
-
-V1 LEARNINGS:
-  - Morning only (10:00-11:30) is clearly best
-  - 30-min and 15-min OR both work, 45-min is worse
-  - Tight targets (0.5-1.0x) beat wide targets
-  - 0.5x stop is the sweet spot
-  - Shorts outperform longs (+$731 vs +$413)
-  - 10:00 and 10:30 AM are best entry times
-  - TSLA, PLTR, AMAT are consistent losers
-  - AMD, LRCX, WMT, HOOD are top performers
-
-V2 NEW VARIABLES TO TEST:
-  1. Finer OR periods: 15, 20, 25, 30 min
-  2. Finer target/stop: 0.25x increments
-  3. Gap filter: only trade in direction of gap, or skip large gaps
-  4. Min OR range filter: skip narrow ORs (low vol days)
-  5. Trend filter: only trade if price is on same side of prev close
-  6. Ticker filter: exclude worst 5 tickers vs include all
-  7. Short-only mode: given shorts outperform
-  8. Entry delay: wait 1-2 bars after breakout for confirmation
-  9. Wider entry window: 10:00-12:00 vs 10:00-11:30 vs 10:15-11:15
-  10. Max trades per day: 1, 2, 3
+V2 refinement based on V1 findings: morning-only and tight targets work, shorts beat longs.
+New variables: finer OR periods, 0.25x target/stop increments, gap direction filter,
+minimum OR range filter, trend filter, ticker exclusion, short-only mode, and entry delay.
 """
 
 import sys
@@ -45,7 +25,7 @@ LOSER_TICKERS = {"TSLA", "PLTR", "AMAT", "CRM", "GOOGL", "MSFT", "NVDA"}
 
 
 def generate_signals_v2(df, params):
-    """V2 signal generation with all new filters."""
+    """ORB signal generation with gap filter, trend filter, OR range filter, and optional entry delay."""
     df = df.copy()
 
     or_minutes = params.get('or_minutes', 30)
@@ -211,7 +191,7 @@ def generate_signals_v2(df, params):
 
 
 def run_single_sim(data_raw, params, universe=None):
-    """Run one parameter combination."""
+    """Run one config against the given universe (or all tickers if None) and return a stats dict."""
     data = {}
     total_signals = 0
 
@@ -286,6 +266,7 @@ def run_single_sim(data_raw, params, universe=None):
 
 
 def main():
+    """Build grouped config sets, sweep them all, and print the top 25 by Sharpe."""
     print("=" * 70)
     print("DEEP STRATEGY SIMULATIONS V2")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

@@ -1,9 +1,7 @@
 """
-Phase 5: Statistical Validation
-
-Determines whether the backtest results are real or noise.
-Includes: core metrics, distribution analysis, robustness checks,
-Monte Carlo simulation, and an honest assessment.
+Puts the backtest results under a microscope to see if the edge is real.
+Runs core metrics, half-split robustness checks, slippage sensitivity,
+Monte Carlo simulation, and prints an honest verdict at the end.
 """
 
 import numpy as np
@@ -18,7 +16,7 @@ OUTPUT_DIR = Path(__file__).parent.parent / "phase5_output"
 
 
 def run_phase5(trade_log: pd.DataFrame, equity_curve: pd.DataFrame = None):
-    """Full statistical validation of backtest results."""
+    """Run the full validation suite on a trade log and print a go/no-go verdict."""
     OUTPUT_DIR.mkdir(exist_ok=True)
 
     print("=" * 70)

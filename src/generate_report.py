@@ -1,6 +1,6 @@
 """
-Full report on best strategy from deep simulation.
-Combines Phase 4 trade inspection + Phase 5 validation into one output.
+Full report on the best strategy found in the deep sims.
+Loads the trade log, runs all the Phase 5 validation checks, and generates charts — all in one go.
 """
 
 import sys

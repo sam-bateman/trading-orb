@@ -1,6 +1,6 @@
 """
-Run V4 strategy on 12-month Alpaca dataset (234 days vs 41).
-This is the real test — does the edge survive on 6x more data?
+Test the V4 asymmetric ORB config on the full 12-month Alpaca dataset.
+The 41-day initial backtest looked good — this is the sanity check on 6x more data.
 """
 
 import sys
@@ -22,6 +22,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 
 def run_backtest_12m():
+    """Load 12-month data, run V4 signals, backtest, and print the full results with robustness checks."""
     print("=" * 70)
     print("12-MONTH BACKTEST — V4 ASYMMETRIC ORB")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

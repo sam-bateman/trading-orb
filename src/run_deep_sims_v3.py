@@ -1,27 +1,8 @@
 """
-Deep Strategy Simulations V3 — Optimize around V2's short-only 15-min OR discovery.
-
-V2 LEARNINGS:
-  - Short-only is the dominant edge (top 6 all short-only)
-  - 15-min OR beats 30-min (tighter levels)
-  - 0.375x stop is optimal (very tight, 2.67:1 R:R)
-  - 1.0x target is sweet spot
-  - Volume filter at 1.0x (no filter) generates more trades
-  - Morning session 10:00-11:30 confirmed
-
-V3 NEW VARIABLES:
-  1. Ultra-fine stop tuning: 0.25, 0.3, 0.35, 0.375, 0.4, 0.45
-  2. Ultra-fine target tuning: 0.75, 0.875, 1.0, 1.125, 1.25, 1.375, 1.5
-  3. OR periods: 10, 12, 15, 18, 20 min (fine-tune around 15)
-  4. Entry window start: 9:50 (aggressive), 10:00, 10:05, 10:15
-  5. Entry window end: 11:00, 11:15, 11:30, 11:45, 12:00
-  6. Require close below OR low by X% (breakout strength filter)
-  7. Minimum bars below/above VWAP before entry (trend confirmation)
-  8. Volume spike on breakout bar specifically (not relative to time-of-day)
-  9. Short-only + filtered tickers (remove stocks that lose on shorts)
-  10. Combine best short with best long (run both directions with separate params)
-  11. ATR-relative OR filter (skip when OR is unusually wide or narrow vs ATR)
-  12. Multiple positions per day: allow re-entry after target hit
+Ultra-fine tuning around V2's short-only 15-min OR discovery.
+V2 established the core setup. V3 tightens the knobs: sub-0.1x stop increments,
+OR period from 10-20 min, breakout strength filter, VWAP confirmation,
+volume spike on the entry bar, and OR range bounds to skip extreme days.
 """
 
 import sys
@@ -41,7 +22,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 
 def generate_signals_v3(df, params):
-    """V3 signal generation with refined short-focused filters."""
+    """ORB signal generation with breakout strength filter, VWAP confirmation, OR range bounds, and volume spike gate."""
     df = df.copy()
 
     or_minutes = params.get('or_minutes', 15)
@@ -165,7 +146,7 @@ def generate_signals_v3(df, params):
 
 
 def run_sim(data_raw, params, universe=None):
-    """Run one config."""
+    """Run one config and return a stats dict with slippage sensitivity and outlier dependency fields."""
     data = {}
     total_signals = 0
     symbols = universe or list(data_raw.keys())
@@ -246,6 +227,7 @@ def run_sim(data_raw, params, universe=None):
 
 
 def main():
+    """Run the V3 grid and rank by bulletproof criteria: profitable, both halves, 2x slippage, no outlier dependency."""
     print("=" * 70)
     print("DEEP STRATEGY SIMULATIONS V3")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

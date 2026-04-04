@@ -1,14 +1,8 @@
 """
-Phase 1: Universe Selection and Market Microstructure Analysis
-
-Screens NYSE/NASDAQ stocks for intraday tradability:
-- Avg daily dollar volume > $50M
-- Price $20-$500
-- ATR as % of price > 1.5%
-- Tight estimated spreads
-
-Then analyzes intraday behavior: volume profiles, range by hour,
-and trending vs mean-reverting character.
+Screen a broad list of tickers for intraday tradability, then dig into microstructure
+for the ones that pass. Filters on dollar volume, price range, ATR, and spread estimate.
+Follow-up analysis covers volume profiles, hourly range, and return autocorrelation
+to flag stocks as trending, mean-reverting, or neutral.
 """
 
 import numpy as np
@@ -64,7 +58,7 @@ SCREEN_UNIVERSE = [
 
 
 def fetch_daily_stats(symbols: list, days: int = 60) -> pd.DataFrame:
-    """Fetch daily data and compute screening metrics."""
+    """Pull daily OHLCV from yfinance and compute ATR, spread estimate, and dollar volume for each ticker."""
     end = datetime.now()
     start = end - timedelta(days=days + 30)  # Extra buffer for ATR calc
 
@@ -133,7 +127,7 @@ def fetch_daily_stats(symbols: list, days: int = 60) -> pd.DataFrame:
 
 
 def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
-    """Apply intraday tradability filters."""
+    """Keep only stocks that clear all four liquidity and volatility thresholds."""
     filtered = df[
         (df['avg_dollar_volume'] >= 50) &       # $50M+ daily dollar volume
         (df['avg_price'] >= 20) &                # $20+ price
@@ -151,7 +145,7 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 
 def fetch_intraday_data(symbol: str, days: int = 59) -> pd.DataFrame:
-    """Fetch 5-minute intraday data (Yahoo limit: ~59 days for intraday)."""
+    """Pull 5-min bars from yfinance. Yahoo caps intraday history at ~59 days."""
     end = datetime.now()
     start = end - timedelta(days=days)
 
@@ -181,7 +175,7 @@ def fetch_intraday_data(symbol: str, days: int = 59) -> pd.DataFrame:
 
 
 def compute_volume_profile(df: pd.DataFrame) -> pd.DataFrame:
-    """Average volume by 15-minute bucket across all days."""
+    """Mean volume per 15-min bucket — shows when the stock is actually active."""
     profile = df.groupby('time_bucket')['Volume'].mean().reset_index()
     profile.columns = ['time_bucket', 'avg_volume']
     profile = profile.sort_values('time_bucket')
@@ -189,7 +183,7 @@ def compute_volume_profile(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def compute_hourly_range(df: pd.DataFrame) -> pd.DataFrame:
-    """Average price range by hour."""
+    """High minus low by hour, averaged across all days. Useful for spotting which hours move."""
     hourly = df.groupby(['trading_day', 'hour_bucket']).agg(
         high=('High', 'max'),
         low=('Low', 'min'),
@@ -202,8 +196,7 @@ def compute_hourly_range(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def compute_autocorrelation(df: pd.DataFrame, periods: int = 1) -> float:
-    """Autocorrelation of 15-minute returns.
-    Positive = trending. Negative = mean-reverting."""
+    """Lag-N autocorrelation of 15-min returns. Positive = trending, negative = mean-reverting."""
     # Resample to 15-minute bars
     df_15m = df.set_index('Date').resample('15min').agg({
         'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
@@ -218,7 +211,7 @@ def compute_autocorrelation(df: pd.DataFrame, periods: int = 1) -> float:
 
 
 def analyze_stock(symbol: str) -> dict:
-    """Full intraday analysis for one stock."""
+    """Run the full microstructure analysis for one ticker and return a results dict."""
     print(f"  Analyzing {symbol}...")
     try:
         df = fetch_intraday_data(symbol)
@@ -261,7 +254,7 @@ def analyze_stock(symbol: str) -> dict:
 # ============================================================
 
 def plot_volume_profiles(analyses: dict, output_dir: Path):
-    """Plot intraday volume profiles for all stocks."""
+    """Grid of volume profile charts, one subplot per stock."""
     n = len(analyses)
     cols = 4
     rows = (n + cols - 1) // cols
@@ -287,7 +280,7 @@ def plot_volume_profiles(analyses: dict, output_dir: Path):
 
 
 def plot_hourly_ranges(analyses: dict, output_dir: Path):
-    """Plot average range by hour."""
+    """Grid of hourly range charts — same layout as volume profiles."""
     n = len(analyses)
     cols = 4
     rows = (n + cols - 1) // cols
@@ -312,7 +305,7 @@ def plot_hourly_ranges(analyses: dict, output_dir: Path):
 
 
 def plot_autocorrelation_summary(analyses: dict, output_dir: Path):
-    """Bar chart of autocorrelation by stock."""
+    """Single bar chart: green = trending, red = mean-reverting, gray = neutral."""
     symbols = []
     autocorrs = []
     colors = []

@@ -1,6 +1,6 @@
 """
-Final Report — Walk-Forward Validated ORB Strategy
-12-month backtest on 20 stocks, optimized on first half, validated on second half.
+Final report for the walk-forward validated ORB strategy.
+Pulls trades from the 12-month backtest, computes all stats, and generates the chart package.
 """
 
 import sys
