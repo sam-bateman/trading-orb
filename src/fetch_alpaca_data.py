@@ -3,6 +3,7 @@ Pull 12 months of 5-min bars from Alpaca for the full universe.
 Cleans and stores as parquet in the same format as intraday_data.py.
 """
 
+import os
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
@@ -21,8 +22,8 @@ DATA_DIR_MAX = Path(__file__).parent.parent / "data" / "intraday_max"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR_MAX.mkdir(parents=True, exist_ok=True)
 
-API_KEY = os.environ.get("ALPACA_API_KEY", "")
-SECRET_KEY = os.environ.get("ALPACA_SECRET_KEY", "")
+API_KEY = os.environ.get("ALPACA_ALPHA_API_KEY", "")
+SECRET_KEY = os.environ.get("ALPACA_ALPHA_SECRET_KEY", "")
 
 UNIVERSE = [
     "NVDA", "TSLA", "MSFT", "AAPL", "AMZN", "GOOGL",

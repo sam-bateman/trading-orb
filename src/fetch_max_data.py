@@ -18,8 +18,8 @@ from alpaca.data.timeframe import TimeFrame
 DATA_DIR = Path(__file__).parent.parent / "data" / "intraday_max"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-API_KEY = os.environ.get("ALPACA_API_KEY", "")
-SECRET_KEY = os.environ.get("ALPACA_SECRET_KEY", "")
+API_KEY = os.environ.get("ALPACA_ALPHA_API_KEY", "")
+SECRET_KEY = os.environ.get("ALPACA_ALPHA_SECRET_KEY", "")
 
 # Stocks with long histories (2016+)
 UNIVERSE_LONG = [
