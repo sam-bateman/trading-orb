@@ -1,7 +1,7 @@
 venv/
 __pycache__/
 *.pyc
-data/
+/data/
 *.parquet
 paper_trade_logs/
 phase1_output/
@@ -26,3 +26,10 @@ regime_results/
 .DS_Store
 .trading_pids
 .worktrees/
+
+# VRP project
+data/vrp_cache/
+.ipynb_checkpoints/
+*.egg-info/
+build/
+dist/
