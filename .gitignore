@@ -25,3 +25,4 @@ regime_results/
 .env
 .DS_Store
 .trading_pids
+.worktrees/
