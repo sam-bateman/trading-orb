@@ -132,7 +132,7 @@ the profitable one**:
 | variant | train Sharpe | test Sharpe | train ret | test ret | train MDD | test MDD |
 |---|---|---|---|---|---|---|
 | short front / long second (spec) | −0.74 | −0.60 | −14.7% | −11.7% | −60% | −58% |
-| **long front / short second** | **+0.64** | **+0.46** | **+12.7%** | **+9.1%** | **−15%** | **−17%** |
+| **long front / short second** | **+0.60** | **+0.43** | **+11.9%** | **+8.3%** | **−15%** | **−17%** |
 
 Mechanically, the flipped variant captures a small daily positive drift
 because front-month VX decays *proportionally faster* than second-month

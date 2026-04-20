@@ -78,9 +78,10 @@ def main() -> None:
     plt.close(fig)
 
     # ---- Direction-flip comparison -----------------------------------------
-    baseline = run_strategy_a(vx, tc_bps_per_roll=1.0)
-    base_ret = baseline["daily_return"]
-    flipped_ret = -base_ret  # long-front / short-second is -daily_return
+    base_ret = run_strategy_a(vx, tc_bps_per_roll=1.0,
+                              direction="short_front")["daily_return"]
+    flipped_ret = run_strategy_a(vx, tc_bps_per_roll=1.0,
+                                 direction="long_front")["daily_return"]
 
     variant_results = {
         "short_front_long_second_baseline": _train_test_sharpe_mdd(base_ret),

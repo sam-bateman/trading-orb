@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from vrp.data.vx_futures import vx_expiration, build_roll_calendar
 from vrp.strategies.strategy_a import run_strategy_a
@@ -65,3 +66,28 @@ def test_strategy_a_roll_mask_triggers_near_expiry():
     assert result["positions"]["is_roll_day"].iloc[-5:].all()
     # Earlier rows should not be flagged
     assert not result["positions"]["is_roll_day"].iloc[:20].any()
+
+
+def test_strategy_a_long_front_flips_pnl_sign():
+    df = _synth_vx_series()
+    short_front = run_strategy_a(df, tc_bps_per_roll=0, direction="short_front")
+    long_front = run_strategy_a(df, tc_bps_per_roll=0, direction="long_front")
+    # With zero tc, flipping direction perfectly negates daily PnL.
+    pd.testing.assert_series_equal(
+        long_front["daily_pnl"],
+        -short_front["daily_pnl"],
+        check_names=False,
+    )
+
+
+def test_strategy_a_long_front_positions_have_opposite_signs():
+    df = _synth_vx_series(n=30)
+    long_front = run_strategy_a(df, direction="long_front")
+    assert (long_front["positions"]["front_qty"] > 0).all()
+    assert (long_front["positions"]["second_qty"] < 0).all()
+
+
+def test_strategy_a_invalid_direction_raises():
+    df = _synth_vx_series()
+    with pytest.raises(ValueError, match="direction must be"):
+        run_strategy_a(df, direction="sideways")  # type: ignore[arg-type]
