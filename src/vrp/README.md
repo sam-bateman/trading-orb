@@ -166,6 +166,91 @@ The result is monotone in costs as expected. The delta between 1 bp and
 gap between the spec direction and the flipped direction at 1 bp. Costs
 are not the primary driver of the negative result; the construction is.
 
+## Phase 2 — Strategy B Results
+
+Phase 2 implements the put-writing leg of the study along three tracks:
+(i) the published CBOE PUT index as the canonical backtest, (ii) a
+Black-Scholes-based synthetic put-writer for pedagogical replication and
+pipeline validation, and (iii) a put-spread variant layered on the
+synthetic engine.
+
+### CBOE PUT index (canonical, published)
+
+Monthly at-the-money cash-secured puts on SPX, executed per CBOE's PUT
+index methodology. The PUT series already bakes in realistic execution
+and transaction costs.
+
+| window | Sharpe | ann. return | ann. vol | max DD | α vs SPX (ann.) | β vs SPX |
+|---|---|---|---|---|---|---|
+| train (2013-2018) | **+0.68** | 6.1% | 9.1% | −15.5% | −0.2% | 0.64 |
+| test  (2019-2024) | **+0.70** | 9.9% | 14.1% | −28.9% | +0.4% | 0.62 |
+
+Beta to SPX sits around 0.6 in both windows — the characteristic
+put-write risk profile (captures most of equity upside, absorbs most of
+equity downside). Annualized alpha is at the noise level, consistent
+with the VRP literature: put-writing delivers a *different risk profile*
+than SPX, not systematic alpha.
+
+### Synthetic Black-Scholes put-writer (replication)
+
+Monthly −0.30Δ short put using VIX as a 30-day ATM IV proxy, 5 bp
+round-trip transaction cost as a fraction of premium.
+
+| window | Sharpe | ann. return | max DD | monthly corr vs PUT |
+|---|---|---|---|---|
+| train | +0.65 | 4.7% | −15.7% | **0.825** ✓ |
+| test  | +0.28 | 3.2% | −26.5% | ″ |
+
+**Sanity gate passes** (monthly correlation 0.825 ≥ 0.6). The synthetic
+engine tracks the PUT index in shape and timing; the 2013-2018 numbers
+are close to PUT's. In 2019-2024 the synthetic underperforms — this is
+consistent with the documented approximations (VIX as ATM IV proxy over-
+estimates during crashes, calendar-month cycles vs third-Friday expiries
+misalign event timing around COVID). The engine is a replication
+artifact, not the primary deliverable; the PUT index is.
+
+### Put-spread variant (short −0.30Δ / long −0.10Δ)
+
+Spread truncates the left tail at the bought-put strike, at the cost of
+a smaller net premium:
+
+| variant | train Sharpe | test Sharpe | train ret | test ret | train MDD | test MDD |
+|---|---|---|---|---|---|---|
+| naked  | +0.65 | +0.28 | 4.7% | 3.2% | −15.7% | −26.5% |
+| **spread** | **+1.26** | **+0.60** | 4.1% | 2.9% | **−4.0%** | **−9.0%** |
+
+Spread is the unambiguous winner on the synthetic engine. For ~0.3-0.4%
+less annualized return, it cuts max drawdown by a factor of ~3–4 and
+roughly doubles Sharpe in both windows. A portfolio allocator would
+trivially prefer the spread. This is the Phase 2 headline: the put-
+spread construction is the strongest single-trade variant identified
+so far in the study, and it is now the natural input for the Phase 4
+meta-allocation layer.
+
+### Strategy A vs Strategy B side-by-side (test window, 2019-2024)
+
+| strategy | Sharpe | ann. return | max DD |
+|---|---|---|---|
+| Strategy A — short front / long second (spec) | −0.60 | −11.7% | −58% |
+| Strategy A — long front / short second (flipped) | +0.43 | 8.3% | −17% |
+| Strategy B — PUT index (canonical) | +0.70 | 9.9% | −29% |
+| Strategy B — synthetic spread (−0.30 / −0.10) | +0.60 | 2.9% | −9% |
+
+Both "working" constructions — flipped VX calendar and put-spread writer
+— land in the same Sharpe band (0.4–0.7) with different drawdown
+profiles. The VX calendar's 17% MDD comes from term-structure inversion
+events; the put-spread's 9% MDD comes from the long-put capping tail
+risk. They are different hedges for different failure modes, which is
+exactly what makes them good candidates to combine in Phase 4.
+
+## Reproduce Strategy B
+
+```bash
+python scripts/run_strategy_b_putindex.py
+python scripts/run_strategy_b_synthetic.py
+python scripts/run_strategy_b_spread.py
+```
+
 ## Limitations (Phase 1)
 
 - Dollar-neutral continuous rolling is an approximation of how a real
