@@ -33,3 +33,4 @@ data/vrp_cache/
 *.egg-info/
 build/
 dist/
+reports/
