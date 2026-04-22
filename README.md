@@ -10,9 +10,11 @@ The target is 0.75x the opening range width, the stop is 0.50x, so the reward/ri
 
 ## Results (10-year backtest, 2016–2026)
 
-4,292 trades across 20 stocks. Win rate of 50.3%, which sounds mediocre until you look at the rest of the numbers. Net PnL of +$30,989 at $400 risk per trade, annualized return of 4.8%, profit factor of 1.31, Sharpe of 2.47, max drawdown of $1,271, Calmar ratio of 24.39. Beta to SPY is essentially zero (-0.004). 19 out of 20 tickers were profitable. 75% of months were profitable. 100% of Monte Carlo trials (10,000) finished positive. The strategy survives 3x the slippage assumptions I used in the backtest.
+4,292 trades across 20 stocks. Win rate of 50.3%, which sounds mediocre until you look at the rest of the numbers. Net PnL of +$30,989 on $100,000 starting capital, at $400 risk per trade — that's a CAGR of 2.71%, profit factor of 1.31, Sharpe of 2.47, max drawdown of $1,271 (1.27% of capital), Calmar of 2.13. Beta to SPY is essentially zero (-0.004). 19 out of 20 tickers were profitable. 75% of months were profitable. 100% of Monte Carlo trials (10,000) finished positive. The strategy survives 3x the slippage assumptions I used in the backtest.
 
-The drawdown number is the thing I keep coming back to. $1,271 max drawdown on ~$31k of gains over a decade is almost too good, which is why I spent a lot of time trying to break it.
+The CAGR is small because the strategy uses very little of available capital — $400 of risk per trade against $100k cash means it's effectively trading on ~1-2% gross utilization most of the time. The honest way to read it: the strategy sat in cash 98% of the time and earned a Sharpe of 2.47 on the active piece. Returns scale with how much capital you're willing to commit; risk metrics don't.
+
+The drawdown number is the thing I keep coming back to. $1,271 max drawdown over a decade is almost too good, which is why I spent a lot of time trying to break it. Net-PnL-to-max-drawdown ratio is ~24× — different number, same point: the strategy almost never gives back its gains.
 
 ## How I built it
 
